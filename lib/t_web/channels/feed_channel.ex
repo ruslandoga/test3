@@ -12,19 +12,18 @@ defmodule TWeb.FeedChannel do
 
     datetime = local_datetime_now(timezone)
     schedule_feed_refresh_at_midnight(datetime, timezone)
+    %Accounts.Profile{} = my_profile = Accounts.get_profile!(socket.assigns.current_user)
 
-    feed =
-      if Feeds.use_demo_feed?() do
-        Feeds.demo_feed(count: params["count"])
-      else
-        my_profile = Accounts.get_profile!(socket.assigns.current_user)
-        Feeds.get_or_create_feed(my_profile, DateTime.to_date(datetime))
-      end
+    # if Feeds.use_demo_feed?() do
+    %{loaded: feed, next_ids: next_ids} =
+      Feeds.demo_feed(my_profile, loaded: params["count"] || 10)
 
-    %Accounts.Profile{} = profile = Accounts.get_profile!(socket.assigns.current_user)
+    # else
+    # Feeds.get_or_create_feed(my_profile, DateTime.to_date(datetime))
+    # end
 
-    {:ok, %{feed: render_profiles(feed), own_profile: render_profile(profile)},
-     assign(socket, timezone: timezone)}
+    {:ok, %{feed: render_profiles(feed), own_profile: render_profile(my_profile)},
+     assign(socket, timezone: timezone, profile: my_profile, next_ids: next_ids)}
   end
 
   @impl true
@@ -33,6 +32,12 @@ defmodule TWeb.FeedChannel do
     user = socket.assigns.current_user
     Feeds.like_profile(user.id, profile_id)
     {:reply, :ok, socket}
+  end
+
+  def handle_in("more", %{"count" => count}, socket) do
+    %{next_ids: next_ids} = socket.assigns
+    %{loaded: feed, next_ids: next_ids} = Feeds.demo_feed(next_ids, loaded: count)
+    {:reply, {:ok, %{feed: render_profiles(feed)}, assign(socket, next_ids: next_ids)}}
   end
 
   def handle_in("report", %{"report" => report}, socket) do

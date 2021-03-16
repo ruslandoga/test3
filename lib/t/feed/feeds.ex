@@ -95,39 +95,38 @@ defmodule T.Feeds do
     !!Application.get_env(:t, :use_demo_feed?)
   end
 
-  @doc "demo_feed(count: 13)"
-  def demo_feed(opts \\ []) do
-    user_ids = [
-      "00000177-679a-ad79-0242-ac1100030000",
-      "00000177-8ae4-b4c4-0242-ac1100030000",
-      "00000177-830a-a7d0-0242-ac1100030000",
-      "00000177-82ed-c4c9-0242-ac1100030000",
-      "00000177-809e-4ef7-0242-ac1100030000",
-      "00000177-7d1f-61be-0242-ac1100030000"
-    ]
+  @doc "demo_feed(profile, loaded: 13) or demo_feed(next_ids, loaded: 13)"
+  def demo_feed(profile_or_next_ids, opts \\ [])
+
+  def demo_feed(%{user_id: user_id} = _profile, opts) do
+    first_real = "00000177-679a-ad79-0242-ac1100030000"
 
     real =
       Profile
-      |> where([p], p.user_id in ^user_ids)
+      |> where([p], p.user_id != ^user_id)
+      |> where([p], p.user_id >= ^first_real)
+      |> select([p], p.user_id)
       |> Repo.all()
       |> Enum.shuffle()
 
     fakes =
-      if count = opts[:count] do
-        fakes_count = count - length(real)
+      Profile
+      |> where([p], p.user_id < ^first_real)
+      |> where([p], p.gender == "F")
+      |> select([p], p.user_id)
+      # |> order_by([p], desc: p.user_id)
+      |> Repo.all()
+      |> Enum.shuffle()
 
-        if fakes_count > 0 do
-          Profile
-          |> where([p], p.user_id not in ^user_ids)
-          |> where([p], p.gender == "F")
-          |> limit(^fakes_count)
-          |> order_by([p], desc: p.user_id)
-          |> Repo.all()
-          |> Enum.shuffle()
-        end
-      end || []
+    ids = real ++ fakes
+    demo_feed(ids, opts)
+  end
 
-    real ++ fakes
+  def demo_feed(next_ids, opts) when is_list(next_ids) do
+    loaded_count = opts[:loaded] || 10
+    {to_fetch, next_ids} = Enum.split(next_ids, loaded_count)
+    loaded = Profile |> where([p], p.user_id in ^to_fetch) |> Repo.all()
+    %{loaded: loaded, next_ids: next_ids}
   end
 
   defp get_feed(profile, date, opts) do

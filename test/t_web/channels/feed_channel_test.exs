@@ -20,7 +20,8 @@ defmodule TWeb.FeedChannelTest do
       assert {:ok, %{feed: feed}, _socket} =
                subscribe_and_join(socket, "feed:" <> me.user_id, %{"timezone" => "Europe/Moscow"})
 
-      assert length(feed) == 5
+      #  assert length(feed ) ==5
+      assert length(feed) == 10
     end
   end
 
